@@ -2,7 +2,6 @@
 
 import type React from "react"
 
-import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -20,30 +19,27 @@ export default function LoginPage() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
-    const supabase = createClient()
     setIsLoading(true)
     setError(null)
 
     try {
-      const { error: signInError } = await supabase.auth.signInWithPassword({
-        email,
-        password,
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email, password }),
       })
 
-      if (signInError) throw signInError
+      const data = await response.json()
 
-      // Get employee role to redirect appropriately
-      const { data: employee } = await supabase
-        .from("employees")
-        .select("role")
-        .eq("id", (await supabase.auth.getUser()).data.user?.id)
-        .single()
-
-      if (employee?.role === "admin") {
-        router.push("/admin")
-      } else {
-        router.push("/dashboard")
+      if (!response.ok) {
+        throw new Error(data.error || "Login failed")
       }
+
+      // Redirect based on role
+      router.push(data.redirectTo)
+      router.refresh()
     } catch (error: unknown) {
       setError(error instanceof Error ? error.message : "An error occurred")
     } finally {
